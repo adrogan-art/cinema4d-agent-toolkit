@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cinema 4D c4dpy Runtime"
+  short_description: "Safe headless execution for Cinema 4D Python"
+  default_prompt: "Use $cinema4d-c4dpy to run and verify this Cinema 4D Python assertion without the GUI."

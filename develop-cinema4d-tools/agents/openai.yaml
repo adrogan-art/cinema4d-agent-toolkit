@@ -1,0 +1,4 @@
+interface:
+  display_name: "Develop Cinema 4D Tools"
+  short_description: "Build and verify Cinema 4D scripts and plugins"
+  default_prompt: "Use $develop-cinema4d-tools to design, implement, and verify this Cinema 4D Python script or plugin."

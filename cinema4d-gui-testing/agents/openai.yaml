@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cinema 4D GUI Testing"
+  short_description: "Run isolated deterministic Cinema GUI tests"
+  default_prompt: "Use $cinema4d-gui-testing to run an isolated Cinema 4D GUI integration test."
