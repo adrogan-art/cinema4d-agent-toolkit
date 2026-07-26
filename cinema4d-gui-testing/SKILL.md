@@ -60,6 +60,44 @@ Add `--scene-readonly C:\path\scene.c4d` only when the driver needs a source sce
 
 The supervisor starts Cinema with `CreateProcessW(CREATE_SUSPENDED)`, assigns that exact process handle to a private `KILL_ON_JOB_CLOSE` Job Object, and only then resumes it. Any containment, protocol, crash, timeout, stale-evidence, or source-mutation failure is a failed test.
 
+## Importing a copied plugin package from a driver
+
+The supervisor renames every copied source. A package directory arrives as
+`plugins/source-01-<name>`, and a single-file `--plugin-source` arrives as a
+*directory* `plugins/source-02-<name>.py` holding the file under its real name.
+
+Consequences for the driver:
+
+- A package whose modules use absolute self-imports (`from mypkg.x import y`)
+  cannot be imported by adding a path, because the directory no longer carries
+  the package name. Register it explicitly and let submodules resolve through
+  the package `__path__`:
+
+```python
+spec = importlib.util.spec_from_file_location(
+    "mypkg", os.path.join(package_dir, "__init__.py"),
+    submodule_search_locations=[package_dir])
+module = importlib.util.module_from_spec(spec)
+sys.modules["mypkg"] = module
+spec.loader.exec_module(module)
+```
+
+- For a plugin-root module, put the *containing directory* on `sys.path`, and
+  probe both the supplied path and its parent so the wrapper-directory detail
+  does not matter.
+- Supply every module the package imports at module scope as its own
+  `--plugin-source`. Grep the package for non-stdlib top-level imports before
+  the first launch instead of discovering them one failed run at a time.
+
+## Keep the artifact root path short
+
+Choose a short `--root` such as `C:\Temp\c4dgui1`. The run root nests
+`plugins/source-NN-<original name>/<original name>`, adding well over 100
+characters, and Windows still applies `MAX_PATH` (260) to these APIs: with a long
+root, `os.path.isfile()` silently returns `False` for a file that exists, so the
+driver reports a missing plugin source instead of a path-length failure. Never
+diagnose such a "missing module" without first checking the path length.
+
 ## Opening plugin UI from a driver
 
 Avoid `c4d.CallCommand()` from the bootstrap timer merely to obtain and inspect an
