@@ -20,6 +20,21 @@ actual disposable-host procedure and safety contract.
   an access violation. Clear those references in `DestroyWindow` and again at
   the top of `CreateLayout`; keep only model state across reopens.
 
+## Edit-text round trips
+
+`AddMultiLineEditText` does not return the exact string it was given. Verified in
+Cinema 4D 2026.3.3: text written as `"a\nb\n"` reads back as `"a\r\nb"` — line
+endings become `\r\n` and the trailing newline is dropped.
+
+Never compare gadget text with stored text directly to decide whether the user
+edited something. Normalize both sides first (unify `\r\n` and `\r` to `\n`, then
+strip leading and trailing newlines) and store the normalized form, so the next
+round trip compares equal. Without this, every read of the gadget looks like an
+edit, and dirty-state, versioning, or autosave logic fires on unchanged content.
+
+Keep that comparison in pure code so it is testable without the host; the host
+only supplies the raw string.
+
 ## TreeView
 
 - For flat Python-backed lists, prefer `LV_TREE` for the main text column.
