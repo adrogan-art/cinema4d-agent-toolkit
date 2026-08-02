@@ -139,6 +139,39 @@ timer work non-structural (for example preview synchronization), rebuild rows
 only for explicit structural changes or document switches, and update existing
 gadgets in place for value-only changes.
 
+## Dynamic layout state guardrail
+
+`LayoutFlushGroup()` destroys the gadgets it rebuilds, so any value that lives
+only in a gadget is lost. This is a separate defect from the focus loss above
+and survives every workaround for it: rows come back looking correct while a
+number field, a ComboBox selection, or a LinkBox link silently reverts.
+
+Before rebuilding dynamic rows, read every editable gadget back into the model,
+and when rebuilding, write every one of them back out. Reading first also
+rescues an edit the user typed but never committed with Enter or a focus
+change. Verify one field of each kind, not just the first: a bench that stored
+the row label and the number still lost the ComboBox and the LinkBox.
+
+Assert this in the driver by editing each control, triggering the rebuild, and
+comparing the values afterwards. Comparing the link must use `GetGUID()`;
+Cinema hands out fresh Python wrappers, so `==` and `is` both mislead.
+
+## Row drag-reordering in a GeDialog
+
+Cinema's drag protocol carries scene atoms and files. Python exposes no
+`DRAGTYPE_PRIVATE` and no `GeDialog.HandleMouseDrag`, and
+`GeUserArea.HandleMouseDrag` raises `SystemError: returned NULL without setting
+an exception` for a `BaseContainer`, an atom list, or a string payload. Do not
+plan a row reorder around `BFM_DRAGRECEIVE`.
+
+Let an explicit drag handle own the mouse instead: a small `GeUserArea` that
+calls `MouseDragStart`, loops on `MouseDrag`, and ends with `MouseDragEnd`.
+Cinema's nested drag loop is never entered, so rebuilding rows immediately after
+the drag ends is safe. Drive the insertion index from the absolute pointer
+position read through `GetInputState`, not from the accumulated `MouseDrag`
+delta: the delta runs opposite to the pointer and accumulates drift over a long
+drag.
+
 ## Deterministic screenshot geometry
 
 A driver that captures pixels must fix the window geometry itself before
