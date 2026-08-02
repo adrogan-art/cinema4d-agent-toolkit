@@ -158,19 +158,31 @@ Cinema hands out fresh Python wrappers, so `==` and `is` both mislead.
 
 ## Row drag-reordering in a GeDialog
 
-Cinema's drag protocol carries scene atoms and files. Python exposes no
-`DRAGTYPE_PRIVATE` and no `GeDialog.HandleMouseDrag`, and
-`GeUserArea.HandleMouseDrag` raises `SystemError: returned NULL without setting
-an exception` for a `BaseContainer`, an atom list, or a string payload. Do not
-plan a row reorder around `BFM_DRAGRECEIVE`.
+Both strategies work in Cinema 4D 2026.3, so choose on measured behavior rather
+than on availability.
 
-Let an explicit drag handle own the mouse instead: a small `GeUserArea` that
+`GeUserArea.HandleMouseDrag` accepts `DRAGTYPE_ATOMARRAY` with a list holding
+one `BaseObject` and then delivers `BFM_DRAGRECEIVE` normally. It raises
+`SystemError: returned NULL without setting an exception` for `DRAGTYPE_ICON`
+with a `BaseContainer` and with `None`, and Python exposes neither
+`DRAGTYPE_PRIVATE` nor `GeDialog.HandleMouseDrag`. The payload can therefore
+only be scene atoms: the atom list is a carrier, and a row identity has to
+travel out of band on the dialog. Probe the payload shapes in that order before
+concluding that a drag type is unusable; a single failed shape proves nothing.
+
+Prefer letting an explicit drag handle own the mouse: a small `GeUserArea` that
 calls `MouseDragStart`, loops on `MouseDrag`, and ends with `MouseDragEnd`.
 Cinema's nested drag loop is never entered, so rebuilding rows immediately after
-the drag ends is safe. Drive the insertion index from the absolute pointer
-position read through `GetInputState`, not from the accumulated `MouseDrag`
-delta: the delta runs opposite to the pointer and accumulates drift over a long
-drag.
+the drag ends is safe, and the insertion target stays defined for every sample.
+Under `BFM_DRAGRECEIVE` one measured drag left `CheckDropArea` with no hit for
+46% of its samples, because it answers only for an exact gadget rectangle: the
+marker stalls whenever the pointer crosses the gap between rows or leaves the
+handle column sideways.
+
+Drive the insertion index from the absolute pointer position read through
+`GetInputState`, not from the accumulated `MouseDrag` delta. One measured drag
+reported a pointer offset of +79 px against a delta sum of -79: the delta runs
+opposite to the pointer, and accumulating it also drifts over a long drag.
 
 ## Deterministic screenshot geometry
 
