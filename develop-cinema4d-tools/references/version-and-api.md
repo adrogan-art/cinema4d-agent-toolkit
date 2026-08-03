@@ -34,6 +34,11 @@
   from the container-name entry in the string table.
 - Object Manager traffic lights: `MODE_ON = 0`, `MODE_OFF = 1`,
   `MODE_UNDEF = 2`. `MODE_UNDEF` is the inherited default, not `0`.
+- String tables belong in `res/strings_en-US/`, not the legacy
+  `res/strings_us/`. Cinema 4D 2026.3 ships no `strings_us` folder anywhere; a
+  resource placed there is ignored without any warning and every parameter
+  renders with a blank label while the layout itself loads correctly. Confirm
+  the folder naming against a shipped plugin before assuming the old form.
 
 ## Compatibility changes
 
