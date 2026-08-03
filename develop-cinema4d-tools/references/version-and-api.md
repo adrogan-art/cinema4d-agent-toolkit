@@ -52,6 +52,14 @@
   ones — single parameter queries in which your own IDs are absent entirely.
   Check every `GetParameterI()` result for `None`; code that assumes the full
   description silently does nothing on most calls.
+- `TagData.Execute()` must not return `EXECUTIONRESULT_USERBREAK` on an internal
+  error: that aborts the whole expression pass, so one faulty tag silently stops
+  every other expression in the scene. Log the failure and return
+  `EXECUTIONRESULT_OK`.
+- `BaseObject.GetTag(type)` returns the **last** tag of that type, not the
+  first. Many tags are unique per object anyway — inserting a second `Trsobject`
+  or `Tphong` removes the first — but do not rely on `GetTag` for a stable
+  choice; walk `GetFirstTag()`/`GetNext()` when the identity must not drift.
 - Before inventing a mechanism for a plugin-UI behaviour, grep the user's other
   installed plugins for one that already does it. A working local example beats
   reasoning from the constant list: `DESC_EDITABLE` looks like the obvious
