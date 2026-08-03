@@ -34,13 +34,16 @@
   from the container-name entry in the string table.
 - Object Manager traffic lights: `MODE_ON = 0`, `MODE_OFF = 1`,
   `MODE_UNDEF = 2`. `MODE_UNDEF` is the inherited default, not `0`.
-- The Attribute Manager does **not** grey out a plain `BOOL` for
-  `DESC_EDITABLE` (26), and no other `DESC_*` flag disables a row. Verified in
-  the host by logging `GetDDescription()`: the flag was set on the group and
-  both checkboxes and nothing changed visually. Only two mechanisms actually
-  work — `DESC_HIDE`, which removes the row and shifts everything below it, and
-  `DESC_NAME`, which relabels it in place. When a row must stay put, relabel it;
-  do not promise a greyed-out control.
+- `DESC_EDITABLE` (26) greys a row out **only on a parameter the plugin builds
+  itself**. Setting it on a container returned by `GetParameterI()` for a row
+  declared in a `.res` file has no effect — verified in the host by logging
+  `GetDDescription()`: the flag was applied to the group and both checkboxes
+  and the panel did not change. The working pattern is to build the row with
+  `c4d.GetCustomDataTypeDefault(dtype)`, set `DESC_EDITABLE` on it, and install
+  it with `Description.SetParameter(descid, bc, groupid)`; leave that group
+  empty in the resource. `DescLevel` for `SetParameter` must carry the data
+  type: `c4d.DescLevel(id, c4d.DTYPE_BOOL, 0)`. Rows built this way are also
+  testable headlessly — read `DESC_EDITABLE` back through `GetParameterI()`.
 - `GetDDescription()` is called with **partial** descriptions as well as full
   ones — single parameter queries in which your own IDs are absent entirely.
   Check every `GetParameterI()` result for `None`; code that assumes the full
