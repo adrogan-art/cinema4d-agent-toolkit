@@ -34,6 +34,15 @@
   from the container-name entry in the string table.
 - Object Manager traffic lights: `MODE_ON = 0`, `MODE_OFF = 1`,
   `MODE_UNDEF = 2`. `MODE_UNDEF` is the inherited default, not `0`.
+- To disable a description row instead of removing it, set `DESC_EDITABLE` (26)
+  to `False` in `GetDDescription()`. `DESC_HIDE` removes the row and shifts the
+  rest of the panel, which reads as the layout jumping whenever the user toggles
+  the controlling checkbox. Group IDs resolve through `GetParameterI()` too, so
+  a whole group can be greyed out in one call.
+- `SCALE_V` on the outer `ID_TAGPROPERTIES` group distributes the free vertical
+  space inside that group and opens a large empty gap above the first subgroup.
+  Put `SCALE_V` only on the element that should actually grow, and place
+  `HIDDEN` rows last.
 - String tables belong in `res/strings_en-US/`, not the legacy
   `res/strings_us/`. Cinema 4D 2026.3 ships no `strings_us` folder anywhere; a
   resource placed there is ignored without any warning and every parameter
