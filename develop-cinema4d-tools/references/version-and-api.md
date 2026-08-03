@@ -34,11 +34,20 @@
   from the container-name entry in the string table.
 - Object Manager traffic lights: `MODE_ON = 0`, `MODE_OFF = 1`,
   `MODE_UNDEF = 2`. `MODE_UNDEF` is the inherited default, not `0`.
-- To disable a description row instead of removing it, set `DESC_EDITABLE` (26)
-  to `False` in `GetDDescription()`. `DESC_HIDE` removes the row and shifts the
-  rest of the panel, which reads as the layout jumping whenever the user toggles
-  the controlling checkbox. Group IDs resolve through `GetParameterI()` too, so
-  a whole group can be greyed out in one call.
+- The Attribute Manager does **not** grey out a plain `BOOL` for
+  `DESC_EDITABLE` (26), and no other `DESC_*` flag disables a row. Verified in
+  the host by logging `GetDDescription()`: the flag was set on the group and
+  both checkboxes and nothing changed visually. Only two mechanisms actually
+  work — `DESC_HIDE`, which removes the row and shifts everything below it, and
+  `DESC_NAME`, which relabels it in place. When a row must stay put, relabel it;
+  do not promise a greyed-out control.
+- `GetDDescription()` is called with **partial** descriptions as well as full
+  ones — single parameter queries in which your own IDs are absent entirely.
+  Check every `GetParameterI()` result for `None`; code that assumes the full
+  description silently does nothing on most calls.
+- A tag whose `GetDDescription()` depends on its own parameters must call
+  `c4d.EventAdd()` from `Message()` on `MSG_DESCRIPTION_POSTSETPARAMETER` (19),
+  or the change only appears after the next selection change.
 - `SCALE_V` on the outer `ID_TAGPROPERTIES` group distributes the free vertical
   space inside that group and opens a large empty gap above the first subgroup.
   Put `SCALE_V` only on the element that should actually grow, and place
