@@ -34,23 +34,28 @@
   from the container-name entry in the string table.
 - Object Manager traffic lights: `MODE_ON = 0`, `MODE_OFF = 1`,
   `MODE_UNDEF = 2`. `MODE_UNDEF` is the inherited default, not `0`.
-- `DESC_EDITABLE` (26) greys a row out **only on a parameter the plugin builds
-  itself**. Setting it on a container returned by `GetParameterI()` for a row
-  declared in a `.res` file has no effect — verified in the host by logging
-  `GetDDescription()`: the flag was applied to the group and both checkboxes
-  and the panel did not change. The working pattern is to build the row with
-  `c4d.GetCustomDataTypeDefault(dtype)`, set `DESC_EDITABLE` on it, and install
-  it with `Description.SetParameter(descid, bc, groupid)`; leave that group
-  empty in the resource. `DescLevel` for `SetParameter` must carry the data
-  type: `c4d.DescLevel(id, c4d.DTYPE_BOOL, 0)`. Rows built this way are also
-  testable headlessly — read `DESC_EDITABLE` back through `GetParameterI()`.
+- To grey out a description row, implement `NodeData.GetDEnabling()`. Cinema
+  polls it per parameter and disables whatever returns `False`:
+
+  ```python
+  def GetDEnabling(self, node, descid, t_data, flags, itemdesc):
+      return False if descid[0].id == SOME_PARAM else True
+  ```
+
+  Do **not** reach for `DESC_EDITABLE` (26): it does not grey out a row declared
+  in a `.res` file, verified in the host by logging `GetDDescription()` — the
+  flag was applied to the group and both checkboxes and nothing changed.
+  `DESC_HIDE` works but removes the row and shifts the panel. Use
+  `GetDDescription` only when the set of parameters itself must change, not to
+  enable or disable existing ones.
 - `GetDDescription()` is called with **partial** descriptions as well as full
   ones — single parameter queries in which your own IDs are absent entirely.
   Check every `GetParameterI()` result for `None`; code that assumes the full
   description silently does nothing on most calls.
-- A tag whose `GetDDescription()` depends on its own parameters must call
-  `c4d.EventAdd()` from `Message()` on `MSG_DESCRIPTION_POSTSETPARAMETER` (19),
-  or the change only appears after the next selection change.
+- Before inventing a mechanism for a plugin-UI behaviour, grep the user's other
+  installed plugins for one that already does it. A working local example beats
+  reasoning from the constant list: `DESC_EDITABLE` looks like the obvious
+  answer for greying a row out and is simply the wrong call.
 - `SCALE_V` on the outer `ID_TAGPROPERTIES` group distributes the free vertical
   space inside that group and opens a large empty gap above the first subgroup.
   Put `SCALE_V` only on the element that should actually grow, and place
