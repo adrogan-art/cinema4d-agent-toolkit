@@ -6,6 +6,78 @@
 - Match `c4dpy.exe`, `Cinema 4D.exe`, plugin directory, scene version, and API
   assumptions.
 - Do not silently test a 2026.1 plugin with 2026.3 and claim compatibility.
+- The install directory name is not the version. `Maxon Cinema 4D 2026` can be
+  2026.1.0 while `Maxon Cinema 4D 2026.3.3` sits beside it. Read the executable's
+  file version, and log `c4d.GetC4DVersion()` from inside the run.
+- Maxon publishes an *SDK Change Notes* page per release listing the API delta
+  since the previous one. Between 2026.0.0 and 2026.3.0 that delta is empty —
+  so a symbol missing in 2026.3 was very likely never there, whereas anything
+  introduced in 2026.2 (`RENDERFLAGS_AUTO_SETUP`, `c4d.bitmaps.AllocateRenderBitmap`)
+  is absent from 2026.0 and 2026.1.
+
+## Python runtime
+
+| Cinema 4D | Python core | Library search path | Env var |
+| --- | --- | --- | --- |
+| R20–R21 | 2.7 | `%APPDATA%/MAXON/python27/libs` | `PYTHONPATH` / `C4DPYTHONPATH` |
+| R23 | 3.7 | `%APPDATA%/MAXON/python37/libs` | `C4DPYTHONPATH37` |
+| S24–2023.1 | 3.9 | `%APPDATA%/MAXON/python39/libs` | `C4DPYTHONPATH39` |
+| 2023.2 | 3.10 | `%APPDATA%/MAXON/python310/libs` | `C4DPYTHONPATH310` |
+| 2024.0+ | 3.11.4 | `%APPDATA%/MAXON/python311/libs` | `C4DPYTHONPATH311` |
+
+- The interpreter is derived from CPython but is not identical to it, and a
+  system CPython cannot be substituted. Pure-Python packages usually work;
+  C-extension packages (numpy among them) may fail or work only partially.
+  Maxon supports none of them.
+- Multiple search paths are separated by `;` on Windows and `:` on macOS.
+- Per-app preference directories share a hash and differ by suffix: none for
+  Cinema 4D, `_p` for c4dpy, `_x` for commandline, `_c`/`_s` for Team Render
+  client/server, `_w` for Cineware. They exist only after that app has run once.
+- A `python_init.py` placed at the root of either search path runs before plugin
+  registration during boot, with `doc`, `op`, and `tp` injected. Use
+  `PluginMessage` for per-plugin boot work instead; reserve `python_init.py` for
+  environment-level setup.
+
+## Threading contract
+
+Cinema 4D threads its whole execution and drawing pipeline. These run off the
+main thread: `TagData.Execute`, `TagData.Draw`, `ObjectData.GetVirtualObjects`,
+`ObjectData.Execute`, `ObjectData.Draw`, `ObjectData.DrawShadow`, every other
+`Draw`/`Execute`, and all embedded scripting elements (Python generator, tag,
+effector, field).
+
+Inside them it is **forbidden** to:
+
+- change document structure — `InsertBefore`, `InsertAfter`, `InsertUnder`,
+  `InsertUnderLast`, `Remove`. Doing so while an expression evaluates crashes
+  the application, it does not merely misbehave;
+- call `EventAdd()`;
+- change materials;
+- create undos;
+- call any `Draw()` function;
+- perform GUI work of any kind — messages, dialogs, popups;
+- do file I/O *during drawing* (during execution it is allowed).
+
+Changing parameters of attached elements is tolerated but not recommended
+outside tags. `GetVirtualObjects` may freely build and modify the hierarchy it
+returns, because that hierarchy is not in the document yet.
+
+Before mutating the active document from a `CommandData`, dialog, or timer, call
+`c4d.StopAllThreads()` — including from the main thread, since other threads may
+be reading the document. Assert the context where it matters:
+`c4d.threading.GeIsMainThreadAndNoDrawThread()`.
+
+## Localization
+
+- Supported string folders: `strings_en-US` (mandatory fallback), `ar-AR`,
+  `cs-CZ`, `de-DE`, `es-ES`, `fr-FR`, `it-IT`, `ja-JP`, `ko-KR`, `pl-PL`,
+  `pt-BR`, `ru-RU`, `zh-CN`.
+- Non-ASCII characters in `.str` files must be written as ASCII escape
+  sequences, not as literal characters: `é` becomes `\u00e9`, `ä` becomes
+  `\u00e4`, `品` becomes `\u54c1`. This affects German, French, Russian,
+  Chinese, Japanese and Korean resources. Cinema ships no tool for the
+  conversion, so it belongs in the build step, never in manual editing.
+- Develop in one language, then copy the folder and translate.
 
 ## Symbols and parameters
 
@@ -26,6 +98,9 @@
   wrappers with `==`, which correctly matches two wrappers around the same live
   tag. A `GetGUID()`-based helper silently returns `False` for every tag when it
   swallows `AttributeError`, so status/ownership checks never fire.
+  For sets, dict keys, and change detection use `hash(node)` — Maxon's own 2026
+  examples rely on it, and it is the node's GeMarker UUID, so it is stable for
+  the element's lifetime and equal across two wrappers of the same tag.
 - A description `.res` for a Python plugin must **not** contain
   `NAME <containername>;`. `CONTAINER` resolves through the registered plugin
   description, but `NAME` resolves against the resource symbol table, which

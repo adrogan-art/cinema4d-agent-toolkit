@@ -22,6 +22,14 @@ Use `cinema4d-c4dpy` for:
 Run through the skill's bounded runner. Require the success marker only after all
 assertions and outputs complete.
 
+Build fixtures with `mxutils` rather than by hand or from committed `.c4d`
+files: `mxutils.Random(seed=...)` plus `mxutils.SceneFaker` generate a
+reproducible scene of objects, materials, tags, layers, render data and tracks
+from a seed. Assert with `mxutils.CheckType` / `CheckIterable` so a failure names
+the symbol and expected type, and dump `GetSceneGraphString()` /
+`GetParameterTreeString()` / `GetContainerTreeString()` into the log on failure —
+a structural diff beats re-running with more prints.
+
 For `.pyp`, use `SourceFileLoader`, build the spec with
 `spec_from_loader`, insert the module into `sys.modules` before
 `exec_module()`, and remove it during repeated-import cleanup. Do not use

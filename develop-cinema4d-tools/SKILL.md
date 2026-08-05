@@ -27,10 +27,14 @@ the cheapest valid test tier.
    deciding whether GUI verification is necessary.
 3. Read [references/ui-and-lifecycle.md](references/ui-and-lifecycle.md) for
    `GeDialog`, TreeView, timers, commands, document events, or plugin lifecycle.
-4. Read [references/version-and-api.md](references/version-and-api.md) when API
-   symbols, parameter IDs, renderer objects, or Cinema versions matter.
-5. Read [references/delivery.md](references/delivery.md) before installation or
-   final handoff.
+4. Read [references/dialog-persistence.md](references/dialog-persistence.md)
+   only when a dialog must remember layout or values across open/close, layout
+   switches, or restarts.
+5. Read [references/version-and-api.md](references/version-and-api.md) when API
+   symbols, parameter IDs, threading rules, localization, renderer objects, or
+   Cinema versions matter.
+6. Read [references/delivery.md](references/delivery.md) before installation,
+   encryption, licensing, or final handoff.
 
 ## Workflow
 
