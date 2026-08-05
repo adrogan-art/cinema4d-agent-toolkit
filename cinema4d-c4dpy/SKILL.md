@@ -16,7 +16,21 @@ execution layer:
 
 1. Identify the exact target Cinema 4D version.
 2. Select the matching `c4dpy.exe`; do not silently choose another installed
-   version.
+   version. **The install directory name does not state the version.** On this
+   machine `C:\Program Files\Maxon Cinema 4D 2026\c4dpy.exe` is 2026.1.0, while
+   2026.3.0 and 2026.3.3 live in their own directories. Read the file version
+   before choosing, and print `c4d.GetC4DVersion()` from inside the probe so the
+   log proves which runtime produced the evidence:
+
+   ```powershell
+   Get-ChildItem "C:\Program Files\Maxon Cinema 4D*\c4dpy.exe" |
+     ForEach-Object { "$($_.FullName) -> $($_.VersionInfo.FileVersion)" }
+   ```
+
+   Picking the wrong one fails in the most misleading way possible: symbols
+   introduced in 2026.2 (`RENDERFLAGS_AUTO_SETUP`, `AllocateRenderBitmap`, …)
+   are simply absent, which reads as "the API does not exist" rather than
+   "wrong runtime".
 3. Inspect the probe/script before execution.
 4. Use [scripts/run_c4dpy.ps1](scripts/run_c4dpy.ps1) with explicit executable,
    bounded timeout, redirected stdout/stderr, and a unique success marker.
@@ -35,7 +49,20 @@ Always pass:
 g_licenseModel=LICENSEMODEL::MAXONAPP
 ```
 
-Without it, c4dpy can wait indefinitely for licensing.
+Without it, c4dpy can wait indefinitely for licensing. The other accepted models
+are `LICENSEMODEL::MAXONACCOUNT` (needs `-g_licenseUsername` and
+`-g_licensePassword`, and does not work for accounts federated through Apple,
+Google, or Facebook), `LICENSEMODEL::RLM`, and `LICENSEMODEL::LICENSESERVER`.
+Run the executable interactively once before any automation: the first launch
+prompts for a login and no unattended run succeeds until that is done.
+
+Other c4dpy arguments worth knowing: `-c "<code>"` to execute a string, `-m` to
+run a module, `-B` to suppress `.pyc` writes, `-E` to ignore `PYTHON*` env vars,
+`-S` to skip `site`, and `-g_encryptPypFile=<path>` to encrypt a `.pyp` exactly
+as the *Extensions ▸ Tools ▸ Source Protector* menu command does.
+
+A script passed to c4dpy is a plain Python script, **not** a Script Manager
+script: `doc` and `op` are not defined for you.
 
 ## API preflight for launch-limited work
 
@@ -127,6 +154,38 @@ res = c4d.documents.RenderDocument(
     c4d.RENDERFLAGS_EXTERNAL | c4d.RENDERFLAGS_NODOCUMENTCLONE)
 ```
 
+From 2026.2 onward prefer the documented base flag and let Cinema allocate the
+bitmap; both are absent in earlier runtimes, so guard with `getattr` when the
+script must also run on 2026.0/2026.1:
+
+```python
+bmp = c4d.bitmaps.AllocateRenderBitmap(rdata)   # matches the render settings
+res = c4d.documents.RenderDocument(
+    doc, rdata, bmp, c4d.RENDERFLAGS_AUTO_SETUP, prog=OnProgress, wprog=OnWrite)
+```
+
+- `RENDERFLAGS_AUTO_SETUP` (16385) is an alias for
+  `EXTERNAL | OCIO_RAW_RENDERING` and is the documented base for programmatic
+  rendering.
+- `RENDERFLAGS_NODOCUMENTCLONE` is a performance shortcut that Maxon documents
+  as *not recommended for final renderings*. Keep it for fast iteration probes;
+  drop it for anything delivered.
+- Read the resolution as `RDATA_XRES_VIRTUAL or RDATA_XRES` when honoring the
+  user's render settings — the virtual fields win when they are set.
+- Pass a progress hook. It is the only thing that distinguishes "slow" from
+  "hung" inside a blocking `RenderDocument`, and it costs three lines:
+
+  ```python
+  def OnProgress(percent: float, progressType: int) -> bool:
+      print(f"[render] {progressType} {percent * 100:.0f}%", flush=True)
+      return True
+  ```
+
+  `RENDERPROGRESSTYPE_BEFORERENDERING` / `DURINGRENDERING` / `AFTERRENDERING` /
+  `CANCELLED` cover every engine; the GI and AO stages are Standard/Physical
+  only. Output only reaches the log after the call returns, but a truncated log
+  then still shows the last stage reached.
+
 Because a hang is indistinguishable from a slow render without evidence, use
 staged timeouts: give the first launch of any new build script a short runner
 budget (90-150 s) that only has to reach its first low-res mask `render done`
@@ -144,20 +203,58 @@ short first budgets turn a 15-minute loss into a 2-minute one.
   `CRITICAL: Stop [ge_container.h]`, writes no file, still returns
   `RENDERRESULT_OK`). Save the rendered `MultipassBitmap` yourself and assert
   the file exists.
-- OCIO colour of the returned buffer (A/B-verified in Cinema 4D 2026.3 with
-  Redshift): `RENDERFLAGS_EXTERNAL` returns the **raw render-space** buffer
-  (ACEScg under the ACES preset) regardless of target type; a `flags=0`
-  render returns a view-transformed target. `RENDERFLAGS_OCIO_BAKE_RENDERING`
-  and `RDATA_BAKE_OCIO_VIEW_TRANSFORM(_RENDER)` are no-ops on the external
-  path. To display or save an external capture the way Picture Viewer shows
-  it, convert pixels with
+
+### OCIO colour of the returned buffer
+
+Re-verified in Cinema 4D **2026.3.3** with an A/B/C probe (OCIO document,
+Standard engine pinned on both the render data and the settings clone so the
+`flags=0` reference renders the same image; max 8-bit channel deviation over a
+sampled grid).
+
+Whether the returned buffer is raw render space is **not** a property of
+`RENDERFLAGS_EXTERNAL`. It is controlled by
+`RDATA_BAKE_OCIO_VIEW_TRANSFORM_RENDER` in the settings container you pass:
+
+| Flags | Deviation vs `flags=0` |
+| --- | --- |
+| `EXTERNAL` (settings' `BAKE_..._RENDER` False) | **1** — already view-transformed |
+| `AUTO_SETUP` (= `EXTERNAL \| OCIO_RAW_RENDERING`) | **63** — raw render space |
+| `AUTO_SETUP \| OCIO_BAKE_RENDERING` | **1** — round-trips back |
+
+So `RENDERFLAGS_OCIO_BAKE_RENDERING` is **not** a no-op: it bakes the view
+transform and lands within one 8-bit step of the `flags=0` target. The earlier
+"no-op" reading comes from pairing it with bare `EXTERNAL`; with the settings
+already producing a view-transformed buffer there is nothing left to bake, and
+the flag changes nothing. It only does work when something put the buffer into
+raw render space first — which is exactly what `OCIO_RAW_RENDERING` (and
+therefore `AUTO_SETUP`) does.
+
+Practical rules:
+
+- To get a saveable, Picture-Viewer-looking image in one call, use
+  `RENDERFLAGS_AUTO_SETUP | RENDERFLAGS_OCIO_BAKE_RENDERING`.
+- To keep render-space data for pixel work, use `RENDERFLAGS_AUTO_SETUP` alone,
+  and bake at the end.
+- Never assume; **read** `settings.GetBool(c4d.RDATA_BAKE_OCIO_VIEW_TRANSFORM_RENDER)`
+  and log it next to the flags. The same flag set produces different colour on
+  two documents whose render settings differ.
+- `c4d.documents.BakeOcioViewToBitmap(bmp, settings, savebit)` exists but
+  returned `None` ("no baking necessary") for every `savebit` tried against an
+  `AUTO_SETUP` result in this probe, while the flag on the same render did bake.
+  Do not treat the manual call as equivalent — if you use it, assert it returned
+  a bitmap instead of falling back with `baked or bmp`, or the conversion
+  silently does not happen.
+- Applying the colour converter to a buffer that is already view-transformed
+  double-transforms it (deviation 58). The converter path remains valid only for
+  a confirmed raw render-space buffer:
   `doc.GetColorConverter().TransformColors(rows,
-  c4d.COLORSPACETRANSFORMATION_OCIO_RENDERING_TO_VIEW)` — this matched a
-  `flags=0` reference render within one 8-bit step, while
-  `..._RENDERING_TO_DISPLAY` overshoots (extra display encoding). Full-HD
-  row-batched conversion costs ~0.5 s. The converter produces correct ACES
-  numbers headlessly even when `DOCUMENT_OCIO_VIEW_TRANSFORM_NAME` reads
+  c4d.COLORSPACETRANSFORMATION_OCIO_RENDERING_TO_VIEW)`.
+  `..._RENDERING_TO_DISPLAY` overshoots (deviation 85, extra display encoding).
+  Full-HD row-batched conversion costs ~0.5 s. The converter produces correct
+  ACES numbers headlessly even when `DOCUMENT_OCIO_VIEW_TRANSFORM_NAME` reads
   `None` in c4dpy.
+- `AUTO_SETUP`, `OCIO_RAW_RENDERING`, `OCIO_BAKE_RENDERING` and
+  `AllocateRenderBitmap` do not exist before 2026.2.
 
 ## Safe invocation
 
@@ -194,6 +291,41 @@ if __name__ == "__main__":
 - Assert values and object state, not only object existence.
 - Clean disposable artifacts or save them under a dedicated test/log folder.
 - Avoid exotic console output when Windows encoding is uncertain.
+- Print `c4d.GetC4DVersion()` first, so the log identifies its own runtime.
+
+## Use `mxutils` in probes
+
+`mxutils` ships with Cinema 4D and is pure Python. It removes most of the
+boilerplate a probe would otherwise hand-roll.
+
+```python
+import mxutils
+
+# Assert and unwrap in one step; raises with the inferred symbol name.
+doc = mxutils.CheckType(c4d.documents.GetActiveDocument())
+mats = mxutils.CheckIterable(doc.GetMaterials(), tElement=c4d.BaseMaterial, minCount=1)
+
+# Iterative hierarchy walk; safe and fast on large trees.
+for node in mxutils.IterateTree(doc.GetFirstObject(), yieldSiblings=True):
+    ...
+```
+
+- `CheckType` / `CheckIterable` beat bare `assert x is not None`: the failure
+  message names the symbol and the expected type.
+- On failure, dump structure instead of guessing: `GetSceneGraphString(node)`,
+  `GetParameterTreeString(node)`, `GetContainerTreeString(bc)`. These turn an
+  opaque "wrong value" into a diffable log.
+- `SymbolTranslationCache` / `g_c4d_symbol_translation_cache` maps an integer
+  back to its `c4d` symbol name — use it when reporting an unexpected id.
+- Build fixtures deterministically with `mxutils.Random(seed=...)` and
+  `mxutils.SceneFaker`, which generates objects, materials, tags, layers, render
+  data and tracks. A seeded faker gives a reproducible scene without shipping a
+  `.c4d` file.
+- `IterateTree` is iterative (fast, no recursion limit); `RecurseTree` is
+  marginally faster only below ~100 nodes. `RecurseGraph` also yields
+  non-hierarchical relations such as caches.
+- `@mxutils.TIMEIT(...)` for timing, `@mxutils.SET_STATUS(...)` for status-bar
+  output in the host (a no-op worth avoiding in pure headless probes).
 
 ## Load `.pyp` without registration
 
