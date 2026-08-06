@@ -179,11 +179,23 @@ be reading the document. Assert the context where it matters:
   A parameter that has neither a stored value nor a `DEFAULT` reads as `0`
   (or `None`), so every parameter a `.res` declares should carry an explicit
   `DEFAULT` matching the Python defaults, with a test comparing the two.
-- `UNIT PERCENT` stores a fraction: `1.0` is the `100 %` the user reads.
-  Verified against `MATERIAL_LUMINANCE_BRIGHTNESS` and
-  `CAMERAOBJECT_FILM_OFFSET_X` in 2026.3. `MIN`/`MAX`/`STEP` in the `.res` are
-  fractions too, so a default written as `92.0` for "92 %" shows as 9200 %, and
-  a `MAX` written as `100.0` never clamps anything.
+- `UNIT PERCENT` lives in **two unit domains**, and mixing them fails silently:
+  - the **Python API** reads and writes the stored fraction — `1.0` is the
+    `100 %` the user sees (verified against `MATERIAL_LUMINANCE_BRIGHTNESS`
+    and `CAMERAOBJECT_FILM_OFFSET_X` in 2026.3);
+  - a **`.res` declaration** is in display percent — Redshift's own resources
+    ship `MIN -100; MAX 100;` for a ±100 % offset — and Cinema divides by 100
+    for storage. So `DEFAULT 92.0` in a `.res` stores `0.92`, while writing
+    `92.0` from Python means 9200 %.
+
+  The failure mode when the `.res` side is written in fractions: `MAX 2.0`
+  declares a ±2 % range, and the description clamp then crushes **every**
+  write — including a migration's own repair — to `0.02`, stamping any
+  "migrated" marker over garbage. Measured on a production scene in 2026.3;
+  the clamped read is the tell (`0.92 → 0.02`, `0.04 → 0.01` = the MAX values
+  ÷ 100). When percent placement looks ignored, read the value back through
+  Python and compare it against `MAX ÷ 100` before suspecting the placement
+  code.
 - Redshift node materials are reachable from Python and behave predictably once
   two traps are known.
   `NodeMaterial.CreateDefaultGraph(maxon.Id("com.redshift3d.redshift4c4d.class.nodespace"))`
