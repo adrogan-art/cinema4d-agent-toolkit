@@ -143,6 +143,36 @@ be reading the document. Assert the context where it matters:
   space inside that group and opens a large empty gap above the first subgroup.
   Put `SCALE_V` only on the element that should actually grow, and place
   `HIDDEN` rows last.
+- Redshift node materials are reachable from Python and behave predictably once
+  two traps are known.
+  `NodeMaterial.CreateDefaultGraph(maxon.Id("com.redshift3d.redshift4c4d.class.nodespace"))`
+  builds the usual `standardmaterial` + `output` pair, and
+  `maxon.GraphModelHelper.FindNodesByAssetId(graph, "com.redshift3d.redshift4c4d.nodes.core.standardmaterial", True, out)`
+  finds the node. Then:
+  - `GetInputs().FindChild()` takes a **`maxon.InternedId`**, not a `maxon.Id`.
+    Passing `maxon.Id` raises
+    `TypeError: unable to convert builtins.NativePyData to @net.maxon.datatype.internedid`.
+  - A port written inside `with graph.BeginTransaction()` still reads back its
+    **old** value until `transaction.Commit()`. Verifying before the commit
+    reports every write as silently ignored, which sends you looking for a type
+    mismatch that is not there.
+
+  Port ids are the asset id plus a suffix (`…standardmaterial.emission_color`,
+  `.emission_weight`, `.base_color`, `.refl_weight`). `SetPortValue` takes
+  `maxon.Color` for colours and a plain `float` for scalars.
+- Redshift lights an otherwise unlit scene from a default environment, and the
+  standard material's `refl_weight` starts at **1**. A material meant to read as
+  a flat colour therefore renders with a large specular hotspot until the
+  reflection weight is taken to zero — including in a pixel-measuring test,
+  where the hotspot is indistinguishable from the thing being measured.
+- MoGraph Text has no `c4d` symbol; it is type **1019268**. `c4d.Omotext` does
+  not exist in 2026.3. Its caps are built in the XY plane facing **-Z**, so an
+  unrotated instance already presents its front to a camera looking down +Z.
+  "Rotating it to face the camera" is the bug, not the fix: a 180° heading maps
+  local +X onto camera -X and the string renders in reverse. A bounding-box
+  assertion cannot see this — the box is symmetric — so test reading direction
+  by comparing the camera-space X of two glyphs from `GetCache()`, which yields
+  one child object per character.
 - String tables belong in `res/strings_en-US/`, not the legacy
   `res/strings_us/`. Cinema 4D 2026.3 ships no `strings_us` folder anywhere; a
   resource placed there is ignored without any warning and every parameter
