@@ -287,6 +287,12 @@ if __name__ == "__main__":
 ```
 
 - Use a fresh `c4d.documents.BaseDocument()` per isolated test.
+- Keep every temporary `BaseDocument` referenced for as long as any node, tag,
+  track, or curve taken from it is still used. When the document is
+  garbage-collected its objects die with it, and the next touch raises
+  `ReferenceError: the object '...' is not alive` (verified in 2026.3.3: a
+  helper returned a `CCurve` while its document went out of scope). Return or
+  store the document alongside whatever you hand out of a builder function.
 - Call `ExecutePasses` before reading generator/cache-dependent data.
 - Assert values and object state, not only object existence.
 - Clean disposable artifacts or save them under a dedicated test/log folder.
