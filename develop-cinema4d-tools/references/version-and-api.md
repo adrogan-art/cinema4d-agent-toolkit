@@ -143,6 +143,36 @@ be reading the document. Assert the context where it matters:
   space inside that group and opens a large empty gap above the first subgroup.
   Put `SCALE_V` only on the element that should actually grow, and place
   `HIDDEN` rows last.
+- A `.res` `DEFAULT` is not a fallback that a stored value overrides — it is the
+  value Cinema declines to store. Measured on a production scene in 2026.3:
+  - a parameter whose stored value differs from the `DEFAULT` keeps it across
+    save/reload, and no later `DEFAULT` change touches it;
+  - a parameter written with exactly the `DEFAULT` stores **nothing**, so a
+    later change to that `DEFAULT` retroactively changes what every old file
+    reports for it.
+
+  Two consequences worth designing around:
+  1. **A schema/version parameter declared in the `.res` cannot mark migrations.**
+     Init writes `version = 1` while the resource says `DEFAULT 1`; nothing is
+     stored; raising the resource to `DEFAULT 2` makes every stale tag report 2
+     and the migration never runs. Keep the marker in a private
+     `BaseContainer` on the node instead (`node.GetDataInstance().SetContainer(PLUGIN_ID, …)`),
+     which has no default to fall through to — an absent marker then really
+     does mean "never written by this build".
+  2. **`NodeData.Init()` runs only when the element is created**, and the
+     resource `DEFAULT` is applied then as well, never on load. A parameter the
+     shipping build got wrong is therefore frozen into every scene already
+     saved; plan an in-place migration rather than telling users to delete and
+     re-add the element.
+
+  A parameter that has neither a stored value nor a `DEFAULT` reads as `0`
+  (or `None`), so every parameter a `.res` declares should carry an explicit
+  `DEFAULT` matching the Python defaults, with a test comparing the two.
+- `UNIT PERCENT` stores a fraction: `1.0` is the `100 %` the user reads.
+  Verified against `MATERIAL_LUMINANCE_BRIGHTNESS` and
+  `CAMERAOBJECT_FILM_OFFSET_X` in 2026.3. `MIN`/`MAX`/`STEP` in the `.res` are
+  fractions too, so a default written as `92.0` for "92 %" shows as 9200 %, and
+  a `MAX` written as `100.0` never clamps anything.
 - Redshift node materials are reachable from Python and behave predictably once
   two traps are known.
   `NodeMaterial.CreateDefaultGraph(maxon.Id("com.redshift3d.redshift4c4d.class.nodespace"))`
