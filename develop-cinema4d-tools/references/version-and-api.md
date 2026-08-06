@@ -159,11 +159,22 @@ be reading the document. Assert the context where it matters:
      `BaseContainer` on the node instead (`node.GetDataInstance().SetContainer(PLUGIN_ID, …)`),
      which has no default to fall through to — an absent marker then really
      does mean "never written by this build".
-  2. **`NodeData.Init()` runs only when the element is created**, and the
-     resource `DEFAULT` is applied then as well, never on load. A parameter the
-     shipping build got wrong is therefore frozen into every scene already
-     saved; plan an in-place migration rather than telling users to delete and
-     re-add the element.
+  2. **The resource `DEFAULT` is applied only when the element is created,
+     never on load.** A parameter the shipping build got wrong is therefore
+     frozen into every scene already saved; plan an in-place migration rather
+     than telling users to delete and re-add the element.
+  3. **`NodeData.Init()` itself DOES run on scene load** (with
+     `isCloneInit=False`), *before* the stored values are restored over the
+     node's container — and container keys the file does not carry **survive**
+     that restore (it merges, it does not replace). Measured consequence: a
+     migration marker stamped from `Init()` lands on every legacy tag during
+     loading, outlives the restore, and certifies values this build never
+     wrote — the migration then never fires, while the parameters beside it
+     hold the stale data. Stamp migration markers only from the migration path
+     itself, immediately after writing the migrated values; never from
+     `Init()`. If a build has already shipped Init-stamped markers, bump the
+     schema version to void them — the marker value alone cannot tell the two
+     apart.
 
   A parameter that has neither a stored value nor a `DEFAULT` reads as `0`
   (or `None`), so every parameter a `.res` declares should carry an explicit
