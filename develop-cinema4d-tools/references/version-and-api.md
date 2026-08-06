@@ -143,6 +143,28 @@ be reading the document. Assert the context where it matters:
   space inside that group and opens a large empty gap above the first subgroup.
   Put `SCALE_V` only on the element that should actually grow, and place
   `HIDDEN` rows last.
+- **`c4d.Matrix` has no value equality, and `BaseObject.GetMl()` returns a fresh
+  wrapper on every call.** `if obj.GetMl() != target:` is therefore *always*
+  true and the guard it looks like never guards anything. Measured cost in a
+  200 ms `MessageData` timer: the transform was rewritten on all 20 of 20 idle
+  passes, dirtying a generator into rebuilding its geometry every frame,
+  calling `EventAdd()` five times a second and leaving the document permanently
+  modified. Compare `off`/`v1`/`v2`/`v3` componentwise with a tolerance — plain
+  `==` on the components is unsafe too, since recomputed floats differ in their
+  last bits and each near-miss triggers another write.
+
+  The same applies to any periodic reconciliation: read before every write, and
+  assert in a test that an untouched document reports **zero** changes. Without
+  that assertion this class of bug is invisible — the plugin behaves correctly
+  and merely costs a permanent slice of the main thread.
+- A periodic full-document walk belongs behind
+  `BaseDocument.GetDirty(DIRTYFLAGS_OBJECT | DIRTYFLAGS_DATA)`. Cache the
+  counter and return immediately when it is unchanged; recheck it *after* the
+  pass, since the plugin's own writes bump it and storing the pre-pass value
+  makes every tick look dirty. Splitting the two flags is worth it: the set of
+  nodes to reconcile can only change with `DIRTYFLAGS_OBJECT`, so a value edit
+  reuses the cached list. Measured on 20 101 objects in 2026.3: 21 ms per walk,
+  0.0003 ms per idle tick.
 - A `.res` `DEFAULT` is not a fallback that a stored value overrides — it is the
   value Cinema declines to store. Measured on a production scene in 2026.3:
   - a parameter whose stored value differs from the `DEFAULT` keeps it across
