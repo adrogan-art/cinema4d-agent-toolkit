@@ -277,14 +277,25 @@ be reading the document. Assert the context where it matters:
   whose `DESC_PARENTGROUP` is an **empty `c4d.DescID()`** becomes its own tab
   (its description parent equals that of built-in tabs like "Coordinates");
   a group parented to another group renders as a collapsible section
-  (`DESC_GUIOPEN` controls the default state). Reparent existing params with
-  `bc[DESC_PARENTGROUP] = group_descid; obj.SetUserDataContainer(descid, bc)` —
-  sub-IDs are untouched, so add groups AFTER all params to keep a stable
-  contract. Everything survives save/reload. If no element remains parented to
-  the root user data group, the "User Data" tab disappears entirely. Do NOT
-  try to rename the root "User Data" group: `SetUserDataContainer` on
-  `((700,5,0),(0,1,0))` reports success but actually inserts a broken
-  `dtype=-1` element instead of renaming.
+  (`DESC_GUIOPEN` controls the default state). **`DESC_PARENTGROUP` only takes
+  effect when set BEFORE the element is created.** Rewriting it later via
+  `SetUserDataContainer` stores the value (container reads it back, it even
+  survives save/reload) but the description never re-resolves it — the params
+  silently vanish from the AM (their description parent falls back to the
+  root). A forced `SetDirty(DIRTYFLAGS_DESCRIPTION)` + `MSG_CHANGE` +
+  `ExecutePasses` does rebuild it, but the robust pattern needs no hacks:
+  `AddUserData` allocates the **first free** sub-ID (not max+1), so pre-create
+  the groups at fixed high sub-IDs via
+  `SetUserDataContainer(DescID(DescLevel(ID_USERDATA, DTYPE_SUBCONTAINER, 0),
+  DescLevel(n, DTYPE_GROUP, 0)), group_bc)`, then add params with
+  `bc[DESC_PARENTGROUP]` already set — they still fill 1..N and a stable
+  sub-ID contract survives. Verify grouping through `GetDescription()`
+  parents, not through the UD container — the container lies about what the
+  AM shows. If no element remains parented to the root user data group, the
+  "User Data" tab disappears entirely. Do NOT try to rename the root
+  "User Data" group: `SetUserDataContainer` on `((700,5,0),(0,1,0))` reports
+  success but actually inserts a broken `dtype=-1` element instead of
+  renaming.
 - Objects created in code get **no Phong tag** — only UI creation adds one
   (verified in 2026.3: `BaseObject(Ocube).GetTag(Tphong)` is `None`). In a
   Python generator, give every parametric object the generator returns its own
