@@ -235,6 +235,23 @@ be reading the document. Assert the context where it matters:
   Port ids are the asset id plus a suffix (`…standardmaterial.emission_color`,
   `.emission_weight`, `.base_color`, `.refl_weight`). `SetPortValue` takes
   `maxon.Color` for colours and a plain `float` for scalars.
+- **Redshift User Data nodes read a C4D user data entry by its display name,
+  and the lookup inherits down the hierarchy** — verified by render in 2026.3
+  (`rsuserdatacolor` wired to `emission_color`, three objects in one frame:
+  own user data → its colour, none → the node's `default` port, child of a null
+  that carries the user data → the parent's colour). Inheritance also crosses a
+  **generator's cache**, so user data on a Python Generator reaches the objects
+  it builds: one shared material can be tinted per instance with no material
+  duplication, no XPresso, and no material writes from the generator (which the
+  threading contract forbids anyway). Asset ids are
+  `com.redshift3d.redshift4c4d.nodes.core.rsuserdata{color,scalar,integer,vector,string}`,
+  with ports `.attribute` (String — the user data name), `.default` (fallback,
+  used when the attribute is absent) and `.out`. `.default` on the colour node
+  takes `maxon.ColorA64(r, g, b, a)` built from **four floats**; passing a
+  `maxon.Color` as the first argument raises
+  `TypeError: unable to convert maxon.vector.Color64 to @float64`.
+  The link is by name, so renaming the user data silently falls back to
+  `.default` — assert the name and the port string against each other in a test.
 - Redshift lights an otherwise unlit scene from a default environment, and the
   standard material's `refl_weight` starts at **1**. A material meant to read as
   a flat colour therefore renders with a large specular hotspot until the
