@@ -253,6 +253,25 @@ be reading the document. Assert the context where it matters:
   resource placed there is ignored without any warning and every parameter
   renders with a blank label while the layout itself loads correctly. Confirm
   the folder naming against a shipped plugin before assuming the old form.
+- `c4d.utils.SendModelingCommand(MCOMMAND_MAKEEDITABLE, ..., doc=doc)` on a
+  Python Generator (`Opython`) returns the generator's virtual hierarchy as
+  real objects and keeps them parametric: `Oplane`, `Osplinerectangle`,
+  `Oloft`, `Oinstance` (links remapped inside the clone), `Olight`, and texture
+  tags all survive with their types; the collapsed root is renamed to the
+  generator's object name, discarding the cache root's own name. The call is
+  NOT read-only: with `doc=` the generator is removed from that document and
+  replaced by the result, so run save/reload assertions before it (verified in
+  2026.3.3 — the `Opython` object was gone from the document after the call).
+- An existing `c4d` enum constant is no proof the target parameter accepts the
+  value: `light[c4d.LIGHT_DETAILS_FALLOFF] = c4d.LIGHT_DETAILS_FALLOFF_INVERSE`
+  (9, legacy) raises `AttributeError: parameter set failed` in 2026.3 because
+  the description cycle no longer lists it, while
+  `LIGHT_DETAILS_FALLOFF_INVERSESQUARE` (10) is accepted. The write itself can
+  throw — probe assignments, not only readbacks.
+- `LIGHT_AREADETAILS_ONLYZ` ("Z Direction Only") does not exist in 2026.3, and
+  the `LIGHT_AREADETAILS_*` container offers no replacement toggle (full symbol
+  dump verified); an area light meant to glow against a wall emits both ways
+  and relies on geometry in front to block the unwanted direction.
 
 ## Compatibility changes
 
