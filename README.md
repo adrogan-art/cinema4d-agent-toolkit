@@ -1,4 +1,4 @@
-# Cinema 4D Skills (public)
+# Cinema 4D Agent Toolkit
 
 Skills for working with Cinema 4D Python from [Claude Code](https://claude.com/claude-code)
 and [Codex](https://openai.com/codex). They teach the assistant how to run
@@ -14,16 +14,16 @@ reusable `.py` / `.pyp` tools without rediscovering the same API traps.
 ## Install
 
 ```sh
-git clone https://github.com/adrogan-art/skills-public.git
-cd skills-public
+git clone https://github.com/adrogan-art/cinema4d-agent-toolkit.git
+cd cinema4d-agent-toolkit
 ./install.sh
 ```
 
 On Windows PowerShell:
 
 ```powershell
-git clone https://github.com/adrogan-art/skills-public.git
-cd skills-public
+git clone https://github.com/adrogan-art/cinema4d-agent-toolkit.git
+cd cinema4d-agent-toolkit
 .\install.ps1
 ```
 
