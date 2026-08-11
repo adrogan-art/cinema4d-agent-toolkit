@@ -296,6 +296,15 @@ be reading the document. Assert the context where it matters:
   "User Data" group: `SetUserDataContainer` on `((700,5,0),(0,1,0))` reports
   success but actually inserts a broken `dtype=-1` element instead of
   renaming.
+- `DESC_MAX` on a user data parameter is a **hard clamp on the value**, not
+  just the slider end: with `MAX 100`, writing 500 (from Python or the UI)
+  stores 100 (verified 2026.3). Omitting `DESC_MAX` leaves the parameter
+  unbounded — the description then reports `±1e+20` for `DTYPE_REAL` and
+  `2147483647` for `DTYPE_LONG` — while `DESC_MINSLIDER`/`DESC_MAXSLIDER`
+  still keep the drag range usable. So declare `DESC_MIN` only where a
+  negative or zero value would break the geometry, set the slider range for
+  comfort, and leave the ceiling open; a `MAX` picked for a "typical" scene
+  silently truncates the first user who exceeds it.
 - **User data cannot be greyed out.** The description builder force-overrides
   `DESC_EDITABLE` to on for every user data row (verified in 2026.3: container
   stores 0, description reports 1, at creation and after a dirty rebuild), so
