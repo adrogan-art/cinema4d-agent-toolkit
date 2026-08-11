@@ -296,6 +296,21 @@ be reading the document. Assert the context where it matters:
   "User Data" group: `SetUserDataContainer` on `((700,5,0),(0,1,0))` reports
   success but actually inserts a broken `dtype=-1` element instead of
   renaming.
+- **User data cannot be greyed out.** The description builder force-overrides
+  `DESC_EDITABLE` to on for every user data row (verified in 2026.3: container
+  stores 0, description reports 1, at creation and after a dirty rebuild), so
+  the documented greying key is a dead end for user data — true greying needs a
+  registered `NodeData` plugin with `GetDEnabling()`. The working conditional
+  UI mechanism for user data is `DESC_HIDE`, which round-trips through the
+  description correctly. For a scripted Python Generator, drive it from the
+  script's `def message(msg_type, data)` hook on
+  `MSG_DESCRIPTION_POSTSETPARAMETER`: it runs on the main thread (unlike
+  `main()`), so rewriting the op's own UD containers there is safe — flip
+  `DESC_HIDE` per rules, then `op.SetDirty(DIRTYFLAGS_DESCRIPTION)` +
+  `EventAdd()`. The hook also fires for `SetParameter` calls from scripts
+  (verified headless), and hidden states persist through save/reload. Guard
+  against re-entry with a module-level flag, and bake the default-state
+  visibility into the containers at creation time.
 - Objects created in code get **no Phong tag** — only UI creation adds one
   (verified in 2026.3: `BaseObject(Ocube).GetTag(Tphong)` is `None`). In a
   Python generator, give every parametric object the generator returns its own
