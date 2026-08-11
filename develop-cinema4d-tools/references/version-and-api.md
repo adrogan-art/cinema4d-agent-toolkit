@@ -272,6 +272,17 @@ be reading the document. Assert the context where it matters:
   the `LIGHT_AREADETAILS_*` container offers no replacement toggle (full symbol
   dump verified); an area light meant to glow against a wall emits both ways
   and relies on geometry in front to block the unwanted direction.
+- Objects created in code get **no Phong tag** — only UI creation adds one
+  (verified in 2026.3: `BaseObject(Ocube).GetTag(Tphong)` is `None`). In a
+  Python generator, give every parametric object the generator returns its own
+  `MakeTag(c4d.Tphong)` — primitives (cube, cylinder, plane) included, not just
+  lofts/sweeps — or the geometry renders faceted after collapse. Prefer
+  area-weighted normals: `tag[c4d.PHONGTAG_STYLE] =
+  c4d.PHONGTAG_STYLE_AREA_WEIGHTED` (2). The style enum in 2026.3:
+  `UNIFORM=0` (default), `ANGLE_WEIGHTED=1`, `AREA_WEIGHTED=2`,
+  `ANGLE_AREA_WEIGHTED=3`, `SQUARE_AREA_WEIGHTED=4`; angle limit is off by
+  default, so also set `PHONGTAG_PHONG_ANGLELIMIT` and a sensible
+  `PHONGTAG_PHONG_ANGLE`.
 
 ## Compatibility changes
 
