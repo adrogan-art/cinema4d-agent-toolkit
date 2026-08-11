@@ -272,6 +272,19 @@ be reading the document. Assert the context where it matters:
   the `LIGHT_AREADETAILS_*` container offers no replacement toggle (full symbol
   dump verified); an area light meant to glow against a wall emits both ways
   and relies on geometry in front to block the unwanted direction.
+- User data can be organized into real Attribute Manager **tabs** and
+  collapsible sections (verified in 2026.3). A `DTYPE_GROUP` user data element
+  whose `DESC_PARENTGROUP` is an **empty `c4d.DescID()`** becomes its own tab
+  (its description parent equals that of built-in tabs like "Coordinates");
+  a group parented to another group renders as a collapsible section
+  (`DESC_GUIOPEN` controls the default state). Reparent existing params with
+  `bc[DESC_PARENTGROUP] = group_descid; obj.SetUserDataContainer(descid, bc)` —
+  sub-IDs are untouched, so add groups AFTER all params to keep a stable
+  contract. Everything survives save/reload. If no element remains parented to
+  the root user data group, the "User Data" tab disappears entirely. Do NOT
+  try to rename the root "User Data" group: `SetUserDataContainer` on
+  `((700,5,0),(0,1,0))` reports success but actually inserts a broken
+  `dtype=-1` element instead of renaming.
 - Objects created in code get **no Phong tag** — only UI creation adds one
   (verified in 2026.3: `BaseObject(Ocube).GetTag(Tphong)` is `None`). In a
   Python generator, give every parametric object the generator returns its own
