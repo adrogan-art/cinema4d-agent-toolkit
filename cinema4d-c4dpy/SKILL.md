@@ -66,6 +66,10 @@ script: `doc` and `op` are not defined for you.
 
 ## API preflight for launch-limited work
 
+For a suspected material/node color conversion error, use the controlled
+procedure in [references/material-color-probes.md](references/material-color-probes.md).
+It supplements the buffer/OCIO contract below without prescribing a scene look.
+
 When the task limits c4dpy launches, do not spend a launch discovering avoidable
 API mistakes. Before the first run, check every newly used `c4d.*` symbol and
 object method against the matching installed SDK stubs or a working local
@@ -203,6 +207,17 @@ short first budgets turn a 15-minute loss into a 2-minute one.
   `CRITICAL: Stop [ge_container.h]`, writes no file, still returns
   `RENDERRESULT_OK`). Save the rendered `MultipassBitmap` yourself and assert
   the file exists.
+
+### Bound an individual animation-frame render
+
+Verified in Cinema 4D **2026.3.3**: `RenderDocument` honors the render data's
+animation range. Setting only `doc.SetTime()` while `RDATA_FRAMESEQUENCE` is
+`ALLFRAMES` starts the entire animation, even when the caller expects one
+bitmap. For a scripted frame loop, set `RDATA_FRAMESEQUENCE` to
+`RDATA_FRAMESEQUENCE_MANUAL` and set both `RDATA_FRAMEFROM` and `RDATA_FRAMETO`
+to that frame's `BaseTime` before each call. Restore the full range before
+saving the deliverable scene. A corrected five-frame probe rendered only the
+requested frames (0, 240, 288, 312, 408), each in roughly 1-2 seconds.
 
 ### OCIO colour of the returned buffer
 
@@ -361,6 +376,27 @@ produce a spec without a loader. Inserting into `sys.modules` before execution i
 required by dataclasses, typing, and similar module-level machinery.
 
 ## Boundaries and known traps
+
+- Fonts in headless c4dpy (verified 2026.3.3): `GeClipMap.GetFontDescription()`
+  returns an **empty** container for every name and name type (even Arial
+  Black), and `EnumerateFonts` yields nothing, so a text spline silently keeps
+  Segoe UI. A hand-built container does resolve system fonts — keys
+  `500` family/full name, `501` size (-11), `502` weight, `503` italic,
+  `504` = 1, set via `c4d.FontData().SetFont(bc)` — but a font installed only
+  for the current user (`%LOCALAPPDATA%\Microsoft\Windows\Fonts`) is not
+  found and falls back to a similar face without error. Verify the font by
+  comparing a measured `GetRealSpline()` width/cap ratio with the ratio
+  computed from the font file (fontTools); for font-independent text, embed
+  glyph outlines and build a Bezier `SplineObject` instead.
+
+- In Cinema 4D 2026.3.3, write polygon UVs with
+  `uvw_tag.SetSlow(index, a, b, c, d)`, passing four `c4d.Vector` values.
+  There is no `c4d.UVWStruct` constructor in this Python binding. Verified by
+  creating UVW tags and reading them after saving/reopening a `.c4d` scene.
+
+- `c4d.Vector` was not iterable in the 2026.3.3 geometry validator:
+  `tuple(vector)` raised `TypeError`. Serialize components explicitly with
+  `(vector.x, vector.y, vector.z)` when exporting measured points.
 
 - Do not test `GeDialog`, `GeUserArea`, BaseDraw/editor behavior, global command
   dispatch, or real registration/lifecycle here.
