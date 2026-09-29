@@ -8,6 +8,17 @@ description: Design, implement, diagnose, refactor, and verify Cinema 4D Python 
 Build a maintainable tool that solves the workflow problem and has evidence for
 the cheapest valid test tier.
 
+## Phong tags on created geometry
+
+Explicitly ensure a Phong tag on every newly created surface primitive or
+parametric surface generator, including cubes, spheres, cylinders, planes,
+Extrudes, Sweeps, and Lofts. This applies to standalone scripts, c4dpy, plugins,
+and Python Generators. Do not assume object creation adds the tag. Reuse an
+existing tag; for instances/clones, configure the source geometry. Choose the
+smoothing angle and normal weighting to preserve intended hard edges. Honor
+explicit flat-shading or authored-normal requirements. Version-specific API
+details are in [references/version-and-api.md](references/version-and-api.md).
+
 ## Route the task
 
 - Use this skill for reusable Cinema 4D scripts, plugins, commands, objects,
