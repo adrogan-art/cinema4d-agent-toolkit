@@ -377,6 +377,19 @@ required by dataclasses, typing, and similar module-level machinery.
 
 ## Boundaries and known traps
 
+- Viewport Renderer (hardware preview) does not work in c4dpy (verified 2026.3.3):
+  `RenderDocument` returns OK but draws an editor-style frame at a fixed internal
+  size (letterboxed band, HUD, grid, flat black silhouettes, no Redshift material
+  previews) and ignores Geometry Only. Render viewport animatics with
+  `Commandline.exe` instead — it initialises the real Drawport (DirectX) and
+  renders the active render setting with textures, about 0.2 s per 1080x1920
+  frame: `Commandline.exe g_licenseModel=LICENSEMODEL::MAXONAPP -render scene.c4d
+  -frame 0 1349 -oresolution 1080 1920 -oimage <dir>\f_ -oformat PNG`. The license
+  argument has no leading dash; without it the process waits forever at an
+  interactive license menu. Launch it from PowerShell with an argument array:
+  passing a PowerShell `[string[]]` parameter from bash joins the items with commas
+  into one argument, so the license flag never arrives. Bound the run with a
+  timeout and stop only the PID you started.
 - Fonts in headless c4dpy (verified 2026.3.3): `GeClipMap.GetFontDescription()`
   returns an **empty** container for every name and name type (even Arial
   Black), and `EnumerateFonts` yields nothing, so a text spline silently keeps
