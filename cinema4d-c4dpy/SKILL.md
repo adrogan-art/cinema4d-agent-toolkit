@@ -10,7 +10,11 @@ execution layer:
 
 - use `develop-cinema4d-tools` to design or modify reusable scripts/plugins;
 - use `build-cinema4d-projects` to assemble and validate production scenes;
-- use `cinema4d-gui-testing` when the assertion requires the real host.
+- use `cinema4d-gui-testing` when the assertion requires the real host;
+- when Cinema 4D 2026.4+ is running with its MCP server connected
+  (`mcp__cinema4d__*` tools), scene work may run live there instead, per
+  `build-cinema4d-projects` (`references/live-mcp-mode.md`). The rules here
+  still apply to every `c4dpy` run and to headless saved-scene checks.
 
 ## Required workflow
 
