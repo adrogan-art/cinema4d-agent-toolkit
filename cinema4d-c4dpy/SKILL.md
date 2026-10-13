@@ -290,6 +290,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
 Set the shell/tool timeout longer than `TimeoutSec` so the runner can collect
 evidence and clean its owned process tree.
 
+Pass script arguments as **one** `-ScriptArgs` string and split it inside the
+probe (for example `"scene.c4d|end=45|gen=Name"` → `sys.argv[1].split("|")`).
+When the runner is started through `powershell -File`, a multi-item
+`-ScriptArgs` array arrives mangled and c4dpy stops at its interactive
+license menu until the timeout (verified in 2026.4). Avoid spaces and bare
+numbers as separate arguments for the same reason.
+
 Never terminate processes by executable name. The runner may stop only the root
 PID it launched and descendants of that owned process.
 
@@ -322,6 +329,22 @@ if __name__ == "__main__":
   parameter fails to allocate (`plugin 'c4d.CTrack' (ID 5350) is missing`),
   and `key.SetGeData(curve, n)` stores the key but playback evaluates 0
   (verified in Cinema 4D 2026.4, Count stayed 0 until SetValue was used).
+- A field layer that reads a tag (Vertex Map → `FLweight`): link it with
+  `layer.SetLinkedObject(tag)`. `layer[1000] = tag` reads back `None` and the
+  layer stays empty (2026.4).
+- Deformed points of a **primitive** (Plane, Cube…) live on its cache:
+  `op.GetCache().GetDeformCache()`; `op.GetDeformCache()` returns `None`.
+- `BaseObject.Message(c4d.MSG_MENUPREPARE)` applies the menu defaults, which
+  differ from a freshly allocated node: a Linear Cloner gets Per Step
+  P = (0, 50, 0), a Spline Wrap gets Fix Bounding Box on. When copying values
+  read from a scene, set these explicitly; a "non-default parameters" dump
+  that compares against `c4d.BaseObject(type)` does not show them.
+- A Field Driver tag (`c4d.Tfielddriver`) cannot be wired from Python: its
+  driven-parameter list has hidden state that only the GUI (Add Parameter /
+  drag) creates. A new tag with a byte-identical container, plus the same
+  key-less track on the parameter, stays inert; only a clone of a working tag
+  inside the same document keeps working (2026.4). Build the rest by script and
+  ask the user to drag the parameter onto the tag.
 - Call `ExecutePasses` before reading generator/cache-dependent data.
 - Assert values and object state, not only object existence.
 - Clean disposable artifacts or save them under a dedicated test/log folder.
