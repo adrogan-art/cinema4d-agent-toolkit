@@ -312,6 +312,16 @@ if __name__ == "__main__":
   `ReferenceError: the object '...' is not alive` (verified in 2026.3.3: a
   helper returned a `CCurve` while its document went out of scope). Return or
   store the document alongside whatever you hand out of a builder function.
+  The same applies to a `FieldList` read from a parameter (`op[c4d.FIELDS]`):
+  it is a copy, so keep the list in a variable while walking
+  `GetLayersRoot()`; chaining `op[c4d.FIELDS].GetLayersRoot().GetDown()`
+  raises `ReferenceError: 'c4d.GeListHead' is not alive` (2026.4).
+- Animating an integer parameter (for example a Cloner's `MG_SPLINE_COUNT`):
+  build the track with `DescLevel(pid, c4d.DTYPE_LONG, 0)` and write the key
+  with `key.SetValue(curve, float(n))`. A `DTYPE_REAL` track on a LONG
+  parameter fails to allocate (`plugin 'c4d.CTrack' (ID 5350) is missing`),
+  and `key.SetGeData(curve, n)` stores the key but playback evaluates 0
+  (verified in Cinema 4D 2026.4, Count stayed 0 until SetValue was used).
 - Call `ExecutePasses` before reading generator/cache-dependent data.
 - Assert values and object state, not only object existence.
 - Clean disposable artifacts or save them under a dedicated test/log folder.
